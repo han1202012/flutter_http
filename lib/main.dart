@@ -24,8 +24,16 @@ class _MyAppState extends State<MyApp> {
   Future<CommonModel> httpGet() async {
     //var url = Uri.parse('https://jsonplaceholder.typicode.com/posts/1');
     var url = Uri.parse('https://www.devio.org/io/flutter_app/json/test_common_model.json');
+    // 异步请求 , 获取远程服务器信息
     final response = await http.get(url);
-    Map<String, dynamic> jsonMap = json.decode(response.body);
+
+    /// 处理中文乱码
+    Utf8Decoder utf8decoder = Utf8Decoder();
+    /// 将二进制 Byte 数据以 UTF-8 格式编码 , 获取编码后的字符串
+    String responseString = utf8decoder.convert(response.bodyBytes);
+
+    // 将 json 字符串信息转为 Map<String, dynamic> 类型的键值对信息
+    Map<String, dynamic> jsonMap = json.decode(responseString);
     return CommonModel.fromJson(jsonMap);
   }
 
@@ -39,34 +47,38 @@ class _MyAppState extends State<MyApp> {
         ),
 
         // 线性布局 列
-        body: Column(
-          children: [
+        body: FutureBuilder<CommonModel>(
+          // 设置异步调用的方法
+          future: httpGet(),
 
-            // 按钮
-            InkWell(
-              child: Text("点击按钮进行 HTTP GET 请求"),
+          /// 接收如下类型的对象
+          /// typedef AsyncWidgetBuilder<T> = Widget Function(BuildContext context, AsyncSnapshot<T> snapshot);
+          builder: (BuildContext context, AsyncSnapshot<CommonModel> snapshot){
+            /// 判断 AsyncSnapshot 的连接状态
+            switch(snapshot.connectionState){
 
-              onTap: (){
-                /// httpGet() 方法返回 Future 类型返回值
-                ///   调用 Future 的 then 方法 , 就会在网络请求成功后 , 执行该方法
-                ///   也就是网络请求成功后 , 会自动调用该 then 方法
-                ///   传入 Future 的泛型 CommonModel 对象作为参数
-                httpGet().then((CommonModel value) {
-                  // httpGet 异步返回时 , 回调该方法
-                  setState(() {
-                    httpGetResult =
-                      "HTTP GET 请求结果 :\nuserId : ${value.icon}\n" +
-                          "title : ${value.title}\nurl : ${value.url}";
-                  });
-                });
-              },
-            ),
+              case ConnectionState.none:
+                return Text("未连接");
 
+              case ConnectionState.waiting:
+                /// 返回一个进度条
+                return Center(child: CircularProgressIndicator(),);
 
-            // 在该 Text 组件显示 HTTP GET 请求结果
-            Text(httpGetResult),
+              case ConnectionState.active:
+                /// 激活状态 , 返回一个进度条
+                return Text("");
 
-          ],
+              case ConnectionState.done:
+                /// 请求结束 , 如果出现错误 , 则返回错误信息
+                /// 如果请求成功 , 返回从网络中请求的数据
+                if(snapshot.hasError) {
+                  return Text("请求失败 , 报错信息 : ${snapshot.error}", style: TextStyle(color: Colors.red),);
+                } else {
+                  return Text("请求成功 , 获取信息 : ${snapshot.data?.url}", style: TextStyle(color: Colors.green),);
+                }
+
+            }
+          },
         ),
       ),
     );
